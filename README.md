@@ -17,13 +17,22 @@ An MCP (Model Context Protocol) server for interacting with MongoDB. Provides to
 ## Installation
 
 1. Clone the repository:
+   
+   ```shell
    git clone https://github.com/stevederico/mongo-mcp.git
+   ```
+   
+   ```shell
    cd mongo-mcp
+   ```
 
-2. Install dependencies:
+3. Install dependencies:
+   
+   ```shell
    npm install
+   ```
 
-3. Configure environment variables:
+5. Configure environment variables:
    - Create a .env file in the root directory:
      MONGO_URL=mongodb://localhost:27017
      DB_NAME=myDatabase
@@ -32,10 +41,13 @@ An MCP (Model Context Protocol) server for interacting with MongoDB. Provides to
 ## Usage
 
 1. Start the server:
+
+   ```shell
    npm start
+   ```
    The server will connect to MongoDB and listen for MCP commands via STDIO.
 
-2. Interact with the server using an MCP client (e.g., via STDIO):
+3. Interact with the server using an MCP client (e.g., via STDIO):
    - Query Example:
      {
        "tool": "mongo_query",
@@ -75,14 +87,22 @@ An MCP (Model Context Protocol) server for interacting with MongoDB. Provides to
   - MONGO_URL: MongoDB connection URI (e.g., mongodb://localhost:27017).
   - DB_NAME: Database name.
 - Set these in .env or via system environment variables:
+  ```shell
   export MONGO_URL="mongodb://localhost:27017"
+  ```
+  ```shell
   export DB_NAME="myDatabase"
+  ```
+  ```shell
   npm start
+  ```
 
 ## Development
 
 - Run in dev mode:
+  ```shell
   npm run dev
+  ```
 - Modify server.js to add more tools or adjust behavior.
 
 ## Dependencies
