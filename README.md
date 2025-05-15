@@ -82,6 +82,22 @@ An MCP (Model Context Protocol) server for interacting with MongoDB. Provides to
   - Returns: Inserted document ID.
 
 ## Configuration
+{
+  "mcpServers": {
+    "mongo-mcp": {
+      "command": "node",
+      "args": [
+        "/mongo-mcp/index.js"
+      ],
+      "env": {
+        "MONGO_URL": "mongodb://localhost:27017",
+        "DB_NAME": "mongomcp"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
 
 - Environment Variables:
   - MONGO_URL: MongoDB connection URI (e.g., mongodb://localhost:27017).
