@@ -9,9 +9,14 @@ function loadEnv() {
   try {
     const envContent = readFileSync(".env", "utf-8");
     envContent.split("\n").forEach((line) => {
-      const [key, value] = line.split("=");
-      if (key && value) {
-        process.env[key.trim()] = value.trim();
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return;
+      const idx = trimmed.indexOf("=");
+      if (idx === -1) return;
+      const key = trimmed.slice(0, idx).trim();
+      const value = trimmed.slice(idx + 1).trim();
+      if (key) {
+        process.env[key] = value;
       }
     });
   } catch (err) {
@@ -39,38 +44,38 @@ async function connectToMongo() {
   try {
     await client.connect();
     db = client.db(databaseName);
-    console.log("✅ Connected to MongoDB");
+    console.error("Connected to MongoDB");
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
+    console.error("MongoDB connection error:", err);
     process.exit(1);
   }
 }
-connectToMongo();
 
-// Close MongoDB connection on app termination
-process.on("SIGINT", async () => {
+// Graceful shutdown on SIGINT and SIGTERM
+async function shutdown() {
   await client.close();
-  console.log("MongoDB connection closed");
+  console.error("MongoDB connection closed");
   process.exit(0);
-});
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 const server = new McpServer({
   name: "mongo-mcp",
-  version: "1.0.1",
+  version: "1.2.0",
 });
 
-const toolHandlers = new Map();
-
-// MongoDB query tool
-toolHandlers.set(
+// --- Tool: mongo_query ---
+server.tool(
   "mongo_query",
+  "Run a find query against a MongoDB collection. Returns matching documents as JSON.",
+  { collection: z.string(), query: z.string(), limit: z.number().optional() },
   async ({ collection, query, limit = 10 }) => {
     try {
       if (!db) {
         return { content: [{ type: "text", text: "Database not connected" }] };
       }
-      const coll = db.collection(collection);
-      const results = await coll.find(JSON.parse(query)).limit(limit).toArray();
+      const results = await db.collection(collection).find(JSON.parse(query)).limit(limit).toArray();
       return {
         content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
@@ -82,17 +87,18 @@ toolHandlers.set(
   }
 );
 
-// MongoDB insert tool
-toolHandlers.set(
+// --- Tool: mongo_insert ---
+server.tool(
   "mongo_insert",
+  "Insert a single document into a MongoDB collection. Returns the inserted document ID.",
+  { collection: z.string(), document: z.union([z.string(), z.record(z.any())]) },
   async ({ collection, document }) => {
     try {
       if (!db) {
         return { content: [{ type: "text", text: "Database not connected" }] };
       }
-      const coll = db.collection(collection);
       const doc = typeof document === "string" ? JSON.parse(document) : document;
-      const result = await coll.insertOne(doc);
+      const result = await db.collection(collection).insertOne(doc);
       return {
         content: [{ type: "text", text: `Document inserted with ID: ${result.insertedId}` }],
       };
@@ -104,19 +110,143 @@ toolHandlers.set(
   }
 );
 
-// Register tools
+// --- Tool: mongo_update ---
 server.tool(
-  "mongo_query",
-  { collection: z.string(), query: z.string(), limit: z.number().optional() },
-  toolHandlers.get("mongo_query")
-);
-server.tool(
-  "mongo_insert",
-  { collection: z.string(), document: z.union([z.string(), z.record(z.any())]) },
-  toolHandlers.get("mongo_insert")
+  "mongo_update",
+  "Update documents in a MongoDB collection matching a filter. Returns the count of modified documents.",
+  {
+    collection: z.string(),
+    filter: z.string(),
+    update: z.string(),
+  },
+  async ({ collection, filter, update }) => {
+    try {
+      if (!db) {
+        return { content: [{ type: "text", text: "Database not connected" }] };
+      }
+      const result = await db
+        .collection(collection)
+        .updateMany(JSON.parse(filter), JSON.parse(update));
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Matched ${result.matchedCount}, modified ${result.modifiedCount} document(s)`,
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error updating documents: ${err.message}` }],
+      };
+    }
+  }
 );
 
-// Setup STDIO transport and connect
+// --- Tool: mongo_delete ---
+server.tool(
+  "mongo_delete",
+  "Delete documents from a MongoDB collection matching a filter. Returns the count of deleted documents.",
+  {
+    collection: z.string(),
+    filter: z.string(),
+  },
+  async ({ collection, filter }) => {
+    try {
+      if (!db) {
+        return { content: [{ type: "text", text: "Database not connected" }] };
+      }
+      const result = await db.collection(collection).deleteMany(JSON.parse(filter));
+      return {
+        content: [{ type: "text", text: `Deleted ${result.deletedCount} document(s)` }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error deleting documents: ${err.message}` }],
+      };
+    }
+  }
+);
+
+// --- Tool: mongo_aggregate ---
+server.tool(
+  "mongo_aggregate",
+  "Run an aggregation pipeline on a MongoDB collection. Pass the pipeline as a JSON array of stages.",
+  {
+    collection: z.string(),
+    pipeline: z.string(),
+  },
+  async ({ collection, pipeline }) => {
+    try {
+      if (!db) {
+        return { content: [{ type: "text", text: "Database not connected" }] };
+      }
+      const results = await db
+        .collection(collection)
+        .aggregate(JSON.parse(pipeline))
+        .toArray();
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error running aggregation: ${err.message}` }],
+      };
+    }
+  }
+);
+
+// --- Tool: mongo_list_collections ---
+server.tool(
+  "mongo_list_collections",
+  "List all collection names in the connected MongoDB database.",
+  {},
+  async () => {
+    try {
+      if (!db) {
+        return { content: [{ type: "text", text: "Database not connected" }] };
+      }
+      const collections = await db.listCollections().toArray();
+      const names = collections.map((c) => c.name);
+      return {
+        content: [{ type: "text", text: JSON.stringify(names, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error listing collections: ${err.message}` }],
+      };
+    }
+  }
+);
+
+// --- Tool: mongo_count ---
+server.tool(
+  "mongo_count",
+  "Count documents in a MongoDB collection matching an optional filter.",
+  {
+    collection: z.string(),
+    filter: z.string().optional(),
+  },
+  async ({ collection, filter }) => {
+    try {
+      if (!db) {
+        return { content: [{ type: "text", text: "Database not connected" }] };
+      }
+      const parsedFilter = filter ? JSON.parse(filter) : {};
+      const count = await db.collection(collection).countDocuments(parsedFilter);
+      return {
+        content: [{ type: "text", text: `Count: ${count}` }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error counting documents: ${err.message}` }],
+      };
+    }
+  }
+);
+
+// Wait for MongoDB, then start MCP server
+await connectToMongo();
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.log("✅ MCP Server ready with STDIO transport");
+console.error("MCP Server ready with STDIO transport");
