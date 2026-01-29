@@ -1,133 +1,131 @@
 ## Mongo MCP Server
 
-An MCP (Model Context Protocol) server for interacting with MongoDB. Provides tools for querying and inserting documents into a MongoDB database via STDIO transport.
+An MCP (Model Context Protocol) server for interacting with MongoDB. Provides tools for querying, inserting, updating, deleting, and aggregating documents via STDIO transport.
 
 ## Features
 
-- MongoDB Query Tool: Query collections with customizable limits.
-- MongoDB Insert Tool: Insert documents into collections.
-- STDIO Transport: Compatible with MCP clients over standard input/output.
+- **Query** documents with customizable filters and limits
+- **Insert** single documents into collections
+- **Update** documents matching a filter
+- **Delete** documents matching a filter
+- **Aggregate** with full pipeline support
+- **List** all collections in the database
+- **Count** documents with optional filters
+- STDIO Transport compatible with MCP clients
 
 ## Prerequisites
 
-- Node.js: v18+ (with ES module support).
-- MongoDB: A running instance (local or remote).
-- npm: For dependency management.
+- Node.js v18+
+- MongoDB instance (local or remote)
 
 ## Installation
 
 1. Clone the repository:
-   
+
    ```shell
    git clone https://github.com/stevederico/mongo-mcp.git
-   ```
-   
-   ```shell
    cd mongo-mcp
    ```
 
-3. Install dependencies:
-   
+2. Install dependencies:
+
    ```shell
    npm install
    ```
 
-5. Configure environment variables:
-   - Create a .env file in the root directory:
-     MONGO_URL=mongodb://localhost:27017
-     DB_NAME=myDatabase
-   - Replace mongodb://localhost:27017 with your MongoDB connection string and myDatabase with your database name.
+3. Configure environment variables — create a `.env` file in the root directory:
 
-## Usage
-
-1. Start the server:
-
-   ```shell
-   npm start
    ```
-   The server will connect to MongoDB and listen for MCP commands via STDIO.
-
-3. Interact with the server using an MCP client (e.g., via STDIO):
-   - Query Example:
-     {
-       "tool": "mongo_query",
-       "args": {
-         "collection": "users",
-         "query": "{\"name\": \"Alice\"}",
-         "limit": 5
-       }
-     }
-   - Insert Example:
-     {
-       "tool": "mongo_insert",
-       "args": {
-         "collection": "users",
-         "document": "{\"name\": \"Bob\", \"age\": 30}"
-       }
-     }
-
-## Tools
-
-- mongo_query:
-  - Args:
-    - collection (string): Target collection name.
-    - query (string): JSON-stringified MongoDB query.
-    - limit (number, optional): Max results (default: 10).
-  - Returns: Array of matching documents as JSON.
-
-- mongo_insert:
-  - Args:
-    - collection (string): Target collection name.
-    - document (string | object): JSON-stringified or raw document to insert.
-  - Returns: Inserted document ID.
+   MONGO_URL=mongodb://localhost:27017
+   DB_NAME=myDatabase
+   ```
 
 ## Configuration
- ```shell
+
+Add to your MCP client config (e.g. Claude Desktop):
+
+```json
 {
   "mcpServers": {
     "mongo-mcp": {
       "command": "node",
-      "args": [
-        "/mongo-mcp/index.js"
-      ],
+      "args": ["/path/to/mongo-mcp/index.js"],
       "env": {
         "MONGO_URL": "mongodb://localhost:27017",
-        "DB_NAME": "mongomcp"
-      },
-      "disabled": false,
-      "autoApprove": []
+        "DB_NAME": "myDatabase"
+      }
     }
   }
 }
 ```
 
-- Environment Variables:
-  - MONGO_URL: MongoDB connection URI (e.g., mongodb://localhost:27017).
-  - DB_NAME: Database name.
-- Set these in .env or via system environment variables:
-  ```shell
-  export MONGO_URL="mongodb://localhost:27017"
-  ```
-  ```shell
-  export DB_NAME="myDatabase"
-  ```
-  ```shell
-  npm start
-  ```
+## Tools
 
-## Development
+### mongo_query
 
-- Run in dev mode:
-  ```shell
-  npm run dev
-  ```
-- Modify server.js to add more tools or adjust behavior.
+Run a find query against a collection.
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `collection` | string | yes | Target collection name |
+| `query` | string | yes | JSON-stringified MongoDB query |
+| `limit` | number | no | Max results (default: 10) |
+
+### mongo_insert
+
+Insert a single document into a collection.
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `collection` | string | yes | Target collection name |
+| `document` | string \| object | yes | Document to insert (JSON string or object) |
+
+### mongo_update
+
+Update documents matching a filter.
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `collection` | string | yes | Target collection name |
+| `filter` | string | yes | JSON-stringified filter |
+| `update` | string | yes | JSON-stringified update operation |
+
+### mongo_delete
+
+Delete documents matching a filter.
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `collection` | string | yes | Target collection name |
+| `filter` | string | yes | JSON-stringified filter |
+
+### mongo_aggregate
+
+Run an aggregation pipeline on a collection.
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `collection` | string | yes | Target collection name |
+| `pipeline` | string | yes | JSON-stringified array of pipeline stages |
+
+### mongo_list_collections
+
+List all collection names in the connected database. No arguments.
+
+### mongo_count
+
+Count documents in a collection with an optional filter.
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `collection` | string | yes | Target collection name |
+| `filter` | string | no | JSON-stringified filter (default: all documents) |
 
 ## Dependencies
 
-- @modelcontextprotocol/sdk: MCP server framework.
-- mongodb: MongoDB driver for Node.js.
-- zod: Schema validation for tool arguments.
+- `@modelcontextprotocol/sdk` — MCP server framework
+- `mongodb` — MongoDB driver for Node.js
+- `zod` — Schema validation for tool arguments
 
 ## License
 
